@@ -1,10 +1,11 @@
-import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import readline from 'node:readline';
+import { boundedLines } from './bounded-lines.js';
 
 const RAW_CAPTURE_SUFFIX = 'RAW-UPSTREAM-SSE.txt';
+// A captured event line longer than this is not a usage record; it is skipped without being held in memory.
+const MAX_LINE_CHARS = 8_000_000;
 const CACHE_MS = 10_000;
 let cachedFiles = new Map();
 let cachedAt = 0;
@@ -42,18 +43,11 @@ async function readCapture(file, name) {
   const stat = await fsp.stat(file);
   const result = { inputTokens: 0, outputTokens: 0, totalTokens: 0, responses: 0, model: 'unknown', date: dateFromName(name), at: timeFromName(name) ?? stat.mtimeMs };
   let latest = null;
-  const input = fs.createReadStream(file, { encoding: 'utf8' });
-  const lines = readline.createInterface({ input, crlfDelay: Infinity });
-  try {
-    for await (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      let event;
-      try { event = JSON.parse(line.slice(6)); } catch { continue; }
-      if (event.type === 'response.completed' && event.response && typeof event.response === 'object') latest = event.response;
-    }
-  } finally {
-    lines.close();
-    input.destroy();
+  for await (const line of boundedLines(file, MAX_LINE_CHARS)) {
+    if (!line.startsWith('data: ')) continue;
+    let event;
+    try { event = JSON.parse(line.slice(6)); } catch { continue; }
+    if (event.type === 'response.completed' && event.response && typeof event.response === 'object') latest = event.response;
   }
 
   const usage = latest?.usage;

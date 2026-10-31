@@ -9,8 +9,8 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/usage.test.js test/compatibility.test.js test/model-proportion.test.js",
-    "check": "node --check server.js && node --check src/util.js && node --check src/pricing.js && node --check src/codex.js && node --check src/claude.js && node --check src/aggregate.js && node --check src/codex-account.js && node --check src/local-ollama.js && node --check src/totals.js && node --check src/account-store.js && node --check public/app.js && node --check scripts/audit-package.mjs && npm test",
+    "test": "node --test test/usage.test.js test/compatibility.test.js test/regression.test.js test/util.test.js test/atomic-write.test.js test/store-recovery.test.js test/http.test.js test/codex-accounting.test.js test/http-guard.test.js test/hostile-logs.test.js test/process-tree.test.js test/model-proportion.test.js",
+    "check": "node --check server.js && node --check src/util.js && node --check src/pricing.js && node --check src/codex.js && node --check src/claude.js && node --check src/aggregate.js && node --check src/codex-account.js && node --check src/local-ollama.js && node --check src/totals.js && node --check src/account-store.js && node --check src/atomic-write.js && node --check src/bounded-lines.js && node --check src/http-guard.js && node --check public/app.js && node --check scripts/audit-package.mjs && npm test",
     "audit": "node scripts/audit-package.mjs"
   },
   "license": "MIT",

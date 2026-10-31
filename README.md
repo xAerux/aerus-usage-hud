@@ -86,7 +86,36 @@ Aerus AI Usage HUD is intended to work alongside your existing AI development en
 
 **Using Claude Code?** Keep your Claude Code activity visible alongside your other tools.
 
-**Running Ollama locally?** Include supported local model activity in the same dashboard.
+**Running Ollama locally?** Only usage captured by a specific adapter is recognized:
+
+- Set `AERU_OLLAMA_CAPTURE_DIR` to a folder of captures, or place captures at
+  `${CODEX_HOME}/local14b-tool-adapter/captures/` (default `~/.codex/local14b-tool-adapter/captures/`).
+- Filenames must end in `RAW-UPSTREAM-SSE.txt`; each must contain `data:` JSON events with
+  `type: response.completed` and a `response.usage` object.
+- This repository does **not** ship the producer of these capture files. An ordinary Ollama
+  installation is not automatically measured by the HUD. Other local workflows are unmeasured.
+
+**About the dollar amounts:** They are estimated API-equivalent costs, **not**
+subscription bills or remaining allowance. When a model is not in the HUD's price list, a
+substitute rate is used and the HUD shows a warning naming the model. Cached token reads are
+counted as token usage, with their separate price factors.
+
+**If saved history is damaged:** The HUD keeps a few small files in its data folder (the desktop app
+uses `%LOCALAPPDATA%\Aerus\AI Usage HUD\data`; `node server.js` uses `data/` next to `server.js`, or
+`AERUS_DATA_DIR`). It never overwrites one it cannot read:
+
+- `claude-ledger.json` (Claude Code history kept after Claude Code prunes old transcripts): the HUD
+  shows a warning, leaves it untouched, and shows Claude figures from the transcripts Claude Code still
+  has (older usage is missing). Restore the file from a backup, or move it away to start a new one.
+- `account-snapshots.json` (verified Codex account total and Ollama total): the HUD copies the damaged
+  file to `account-snapshots.json.corrupt-<id>` (or `.unsupported-<id>`), shows a warning, and starts a
+  new one. The Codex total is restored by the next successful online lookup.
+
+**Local access:** The server listens on `127.0.0.1` only and answers only requests addressed to
+`127.0.0.1` or `localhost` on its own port, from its own pages. Another website open in your browser cannot
+read the data. If you deliberately reach it under another name (a local reverse proxy, say), list that name in
+`AERUS_ALLOWED_HOSTS` (comma separated, `name` or `name:port`). This is not a login: other programs running as
+your Windows user can still call it.
 
 Available totals depend on the data that each tool makes accessible. The HUD should not be treated as an official billing statement or guaranteed real-time account usage meter.
 
@@ -138,7 +167,7 @@ The repository is organized into the following main directories:
 | `test/` | Project tests |
 | `packaging/` | Packaging resources |
 
-Refer to `package.json` and the source documentation for available development commands.
+Run the tests with `npm run check` (it needs no network access and writes only to your temp folder).
 
 ---
 

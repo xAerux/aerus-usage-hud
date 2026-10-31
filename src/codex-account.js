@@ -4,8 +4,10 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 
 const REQUEST_TIMEOUT_MS = 12_000;
+// The app-server's replies are small JSON lines; more unread text than this means something is wrong.
+const MAX_BUFFER_CHARS = 1_000_000;
 
-function codexCandidates() {
+export function codexCandidates() {
   const windows = process.platform === 'win32';
   const executable = windows ? 'codex.exe' : 'codex';
   const candidates = [];
@@ -14,7 +16,10 @@ function codexCandidates() {
   };
 
   add(process.env.CODEX_CLI_PATH);
-  for (const folder of (process.env.PATH || '').split(path.delimiter)) add(path.join(folder, executable));
+  // An empty or relative PATH entry means "the current folder"; never run a program found there.
+  for (const folder of (process.env.PATH || '').split(path.delimiter)) {
+    if (folder && path.isAbsolute(folder)) add(path.join(folder, executable));
+  }
 
   const localAppData = process.env.LOCALAPPDATA;
   if (windows && localAppData) {
@@ -40,6 +45,20 @@ function codexCandidates() {
   return candidates;
 }
 
+// On Windows kill() ends only the process itself, so the app-server's own children are ended with taskkill
+// (by full path: a bare name could be resolved from the current folder).
+export function stopChild(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return; // already gone: its pid may be reused
+  if (process.platform === 'win32' && child.pid) {
+    // taskkill has to run while the parent is alive, or it cannot find the children.
+    const taskkill = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe');
+    try {
+      spawn(taskkill, ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).on('error', () => {});
+    } catch { /* Fall through to kill(). */ }
+  }
+  try { child.kill(); } catch { /* The app-server may already have exited. */ }
+}
+
 function readWithCodex(executable) {
   return new Promise((resolve) => {
     let settled = false;
@@ -50,7 +69,7 @@ function readWithCodex(executable) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      try { child?.kill(); } catch { /* The app-server may already have exited. */ }
+      stopChild(child);
       resolve(result);
     };
     const timer = setTimeout(() => finish({ available: false, reason: 'Codex account usage did not respond in time.' }), REQUEST_TIMEOUT_MS);
@@ -72,6 +91,10 @@ function readWithCodex(executable) {
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
       buffer += chunk;
+      if (buffer.length > MAX_BUFFER_CHARS) {
+        finish({ available: false, reason: 'Codex account usage returned an unexpectedly large reply; showing local history.' });
+        return;
+      }
       for (;;) {
         const newline = buffer.indexOf('\n');
         if (newline < 0) break;

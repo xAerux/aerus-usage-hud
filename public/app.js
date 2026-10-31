@@ -66,7 +66,10 @@ async function load() {
   setBusy(true);
   try {
     const response = await fetch(`/api/usage?range=${state.range}&offset=${state.offset}`, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`server returned ${response.status}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || `server returned ${response.status}`);
+    }
     const data = await response.json();
     if (requestId !== state.requestId) return;
     state.data = data;
